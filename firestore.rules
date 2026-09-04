@@ -13,6 +13,21 @@ service cloud.firestore {
         && request.auth.uid == request.resource.data.ownerId;
     }
 
+    // HighLevel OAuth tokens: written only by Cloud Functions (Admin SDK
+    // bypasses rules). Never readable from the client.
+    match /users/{uid}/highlevelToken/{tokenId} {
+      allow read, write: if false;
+    }
+
+    // One-time CSRF token for the HL OAuth `state` param: a signed-in user
+    // may create one for themselves; only the Cloud Function callback
+    // (Admin SDK) ever reads or deletes it.
+    match /oauthStates/{token} {
+      allow create: if request.auth != null
+        && request.auth.uid == request.resource.data.uid;
+      allow read, update, delete: if false;
+    }
+
     // Default deny for anything not explicitly scoped above.
     match /{document=**} {
       allow read, write: if false;

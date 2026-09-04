@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@guolao/vue-monaco-editor": "^1.6.0",
-    "@lucide/vue": "^1.39.0",
+    "@lucide/vue": "^1.40.0",
     "@tailwindcss/vite": "^4.3.3",
     "@vueuse/core": "^14.4.0",
     "class-variance-authority": "^0.7.1",
