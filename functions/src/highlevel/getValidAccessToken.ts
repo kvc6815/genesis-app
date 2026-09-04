@@ -14,7 +14,7 @@ export async function getValidAccessToken(uid: string): Promise<string> {
     return token.accessToken
   }
 
-  const refreshed = await refreshAccessToken(token.refreshToken)
+  const refreshed = await refreshAccessToken(token.refreshToken, token.userType)
   await updateHighLevelToken(uid, refreshed)
   return refreshed.access_token
 }

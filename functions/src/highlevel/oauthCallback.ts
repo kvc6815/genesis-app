@@ -4,6 +4,7 @@ import '../admin'
 import { exchangeAuthorizationCode } from './tokenExchange'
 import { saveHighLevelToken } from './tokenStore'
 import { consumeOAuthState } from './oauthState'
+import { autoUpgradeToLocationToken } from './autoUpgradeToLocation'
 
 function redirectToDashboard(hl: 'connected' | 'error', reason?: string) {
   const url = new URL(`${process.env.FRONTEND_URL}/dashboard`)
@@ -35,9 +36,10 @@ export const hlOAuthCallback = onRequest(async (req, res) => {
   }
 
   try {
-    const token = await exchangeAuthorizationCode(code)
+    const initialToken = await exchangeAuthorizationCode(code)
+    const token = await autoUpgradeToLocationToken(uid, initialToken)
     await saveHighLevelToken(uid, token)
-    logger.info('HL OAuth connected', { uid, locationId: token.locationId })
+    logger.info(`HL OAuth connected for uid=${uid}, userType=${token.userType}, locationId=${token.locationId}`)
     res.redirect(redirectToDashboard('connected'))
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err)
