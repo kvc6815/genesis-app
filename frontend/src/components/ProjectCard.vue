@@ -46,7 +46,7 @@ const updatedLabel = computed(() => formatRelativeTime(props.project.updatedAt))
       </DropdownMenu>
     </CardHeader>
     <div class="flex items-center justify-between px-6 text-xs text-muted-foreground">
-      <span>0 files · 0 snapshots</span>
+      <span>{{ project.fileCount ?? 0 }} files · {{ project.snapshotCount ?? 0 }} snapshots</span>
       <span>{{ updatedLabel }}</span>
     </div>
   </Card>

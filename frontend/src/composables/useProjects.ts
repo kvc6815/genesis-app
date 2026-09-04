@@ -22,6 +22,8 @@ export interface Project {
   ownerId: string
   locationId: string | null
   deleted: boolean
+  fileCount?: number
+  snapshotCount?: number
   createdAt: Timestamp | null
   updatedAt: Timestamp | null
 }
