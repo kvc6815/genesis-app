@@ -24,6 +24,12 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: '/projects/:id',
+      name: 'project-workspace',
+      component: () => import('@/views/ProjectWorkspace.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       path: '/sse-test',
       name: 'sse-test',
       component: () => import('@/views/SseTest.vue'),
