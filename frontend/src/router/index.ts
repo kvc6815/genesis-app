@@ -23,6 +23,12 @@ const router = createRouter({
       component: () => import('@/views/Dashboard.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/sse-test',
+      name: 'sse-test',
+      component: () => import('@/views/SseTest.vue'),
+      meta: { requiresAuth: true },
+    },
   ],
 })
 
