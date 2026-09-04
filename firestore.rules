@@ -11,6 +11,23 @@ service cloud.firestore {
         && request.auth.uid == resource.data.ownerId;
       allow create: if request.auth != null
         && request.auth.uid == request.resource.data.ownerId;
+
+      // Files/snapshots inherit the parent project's ownership — a project
+      // doc read is the cost of every file read, which is fine at this scale.
+      match /files/{fileId} {
+        allow read, write: if request.auth != null
+          && request.auth.uid == get(/databases/$(database)/documents/projects/$(projectId)).data.ownerId;
+      }
+
+      match /snapshots/{snapshotId} {
+        allow read, write: if request.auth != null
+          && request.auth.uid == get(/databases/$(database)/documents/projects/$(projectId)).data.ownerId;
+
+        match /files/{fileId} {
+          allow read, write: if request.auth != null
+            && request.auth.uid == get(/databases/$(database)/documents/projects/$(projectId)).data.ownerId;
+        }
+      }
     }
 
     // HighLevel OAuth tokens: written only by Cloud Functions (Admin SDK

@@ -3,10 +3,24 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useHighLevelConnection } from '@/composables/useHighLevelConnection'
+import { useProjects } from '@/composables/useProjects'
+import ProjectCard from '@/components/ProjectCard.vue'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,12 +32,18 @@ import {
 
 const { user, signOut } = useAuth()
 const { status, loading, buildConnectUrl } = useHighLevelConnection()
+const { projects, loading: projectsLoading, createProject, softDeleteProject } = useProjects()
 const router = useRouter()
 const route = useRoute()
 
 const oauthResult = ref<'connected' | 'error' | null>(null)
 const oauthErrorReason = ref<string | null>(null)
 const connecting = ref(false)
+
+const createOpen = ref(false)
+const newProjectName = ref('')
+const newProjectDescription = ref('')
+const creating = ref(false)
 
 const initials = computed(() => (user.value?.email?.[0] ?? '?').toUpperCase())
 
@@ -48,6 +68,22 @@ async function onConnectHighLevel() {
   } catch {
     connecting.value = false
   }
+}
+
+async function onCreateProject() {
+  creating.value = true
+  try {
+    await createProject(newProjectName.value.trim(), newProjectDescription.value.trim())
+    newProjectName.value = ''
+    newProjectDescription.value = ''
+    createOpen.value = false
+  } finally {
+    creating.value = false
+  }
+}
+
+function onDeleteProject(projectId: string) {
+  void softDeleteProject(projectId)
 }
 </script>
 
@@ -108,11 +144,51 @@ async function onConnectHighLevel() {
 
       <div class="flex items-baseline justify-between">
         <h2 class="font-semibold">Projects</h2>
-        <Button variant="outline" size="sm" disabled title="Coming in the next phase">+ New project</Button>
+        <Dialog v-model:open="createOpen">
+          <DialogTrigger as-child>
+            <Button variant="outline" size="sm">+ New project</Button>
+          </DialogTrigger>
+          <DialogContent>
+            <form @submit.prevent="onCreateProject">
+              <DialogHeader>
+                <DialogTitle>New project</DialogTitle>
+                <DialogDescription>Give it a name and a short description of what it'll do.</DialogDescription>
+              </DialogHeader>
+              <div class="flex flex-col gap-4 py-4">
+                <div class="flex flex-col gap-2">
+                  <Label for="project-name">Name</Label>
+                  <Input id="project-name" v-model="newProjectName" required maxlength="80" />
+                </div>
+                <div class="flex flex-col gap-2">
+                  <Label for="project-description">Description</Label>
+                  <Textarea id="project-description" v-model="newProjectDescription" rows="3" maxlength="280" />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="submit" :disabled="creating || !newProjectName.trim()">
+                  {{ creating ? 'Creating…' : 'Create project' }}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
-      <Card class="flex min-h-32 items-center justify-center border-dashed p-10 text-center text-sm text-muted-foreground">
+
+      <p v-if="projectsLoading" class="text-sm text-muted-foreground">Loading projects…</p>
+      <Card
+        v-else-if="projects.length === 0"
+        class="flex min-h-32 items-center justify-center border-dashed p-10 text-center text-sm text-muted-foreground"
+      >
         Describe your first app to get started.
       </Card>
+      <div v-else class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <ProjectCard
+          v-for="project in projects"
+          :key="project.id"
+          :project="project"
+          @delete="onDeleteProject"
+        />
+      </div>
     </div>
   </main>
 </template>
