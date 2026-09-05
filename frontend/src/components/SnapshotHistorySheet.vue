@@ -15,7 +15,7 @@ import {
 const props = defineProps<{ projectId: string }>()
 const projectId = computed(() => props.projectId)
 
-const { snapshots, activeSnapshotId, restoring, error, restore } = useSnapshots(projectId)
+const { snapshots, activeSnapshotId, restoring, saving, error, restore, save } = useSnapshots(projectId)
 </script>
 
 <template>
@@ -26,8 +26,15 @@ const { snapshots, activeSnapshotId, restoring, error, restore } = useSnapshots(
     <SheetContent side="right" class="flex flex-col gap-4 p-4">
       <SheetHeader class="p-0">
         <SheetTitle>Snapshots</SheetTitle>
-        <SheetDescription>One is created automatically after every successful generation.</SheetDescription>
+        <SheetDescription>
+          One is created automatically after every successful generation. Save one manually to
+          checkpoint edits you've made directly in the editor.
+        </SheetDescription>
       </SheetHeader>
+
+      <Button size="sm" :disabled="saving" @click="save">
+        {{ saving ? 'Saving…' : 'Save Snapshot' }}
+      </Button>
 
       <p v-if="error" class="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{{ error }}</p>
       <p v-if="snapshots.length === 0" class="text-sm text-muted-foreground">No snapshots yet.</p>

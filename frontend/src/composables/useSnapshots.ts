@@ -15,11 +15,16 @@ const restoreProjectSnapshot = httpsCallable<{ projectId: string; snapshotId: st
   functions,
   'restoreProjectSnapshot',
 )
+const createProjectSnapshot = httpsCallable<{ projectId: string }, { snapshotId: string }>(
+  functions,
+  'createProjectSnapshot',
+)
 
 export function useSnapshots(projectId: Ref<string | undefined>) {
   const rawSnapshots = ref<ProjectSnapshot[]>([])
   const activeSnapshotId = ref<string | null>(null)
   const restoring = ref(false)
+  const saving = ref(false)
   const error = ref<string | null>(null)
   let unsubscribeSnapshots: (() => void) | null = null
   let unsubscribeProject: (() => void) | null = null
@@ -74,5 +79,18 @@ export function useSnapshots(projectId: Ref<string | undefined>) {
     }
   }
 
-  return { snapshots, activeSnapshotId, restoring, error, restore }
+  async function save() {
+    if (!projectId.value || saving.value) return
+    saving.value = true
+    error.value = null
+    try {
+      await createProjectSnapshot({ projectId: projectId.value })
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Save failed'
+    } finally {
+      saving.value = false
+    }
+  }
+
+  return { snapshots, activeSnapshotId, restoring, saving, error, restore, save }
 }

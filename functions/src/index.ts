@@ -6,3 +6,4 @@ export { hlSmokeTest } from "./highlevel/smokeTest";
 export { hlProxy } from "./generation/hlProxy";
 export { previewFile } from "./generation/previewFile";
 export { restoreProjectSnapshot } from "./projects/restoreProjectSnapshot";
+export { createProjectSnapshot } from "./projects/createProjectSnapshot";
