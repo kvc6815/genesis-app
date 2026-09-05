@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import type { Timestamp } from 'firebase/firestore'
 import type { Project } from '@/composables/useProjects'
+import { formatRelativeTime } from '@/lib/formatRelativeTime'
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import {
   DropdownMenu,
@@ -18,18 +18,6 @@ const router = useRouter()
 
 function open() {
   router.push({ name: 'project-workspace', params: { id: props.project.id } })
-}
-
-function formatRelativeTime(ts: Timestamp | null): string {
-  if (!ts) return 'just now'
-  const seconds = Math.floor((Date.now() - ts.toMillis()) / 1000)
-  if (seconds < 60) return 'just now'
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  return `${days}d ago`
 }
 
 const updatedLabel = computed(() => formatRelativeTime(props.project.updatedAt))

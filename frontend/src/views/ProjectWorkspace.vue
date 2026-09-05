@@ -5,6 +5,8 @@ import { doc, serverTimestamp, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useProjectFiles } from '@/composables/useProjectFiles'
 import { useGeneration } from '@/composables/useGeneration'
+import { useAuth } from '@/composables/useAuth'
+import SnapshotHistorySheet from '@/components/SnapshotHistorySheet.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -15,8 +17,29 @@ const route = useRoute()
 const router = useRouter()
 const projectId = computed(() => route.params.id as string)
 
+const { user } = useAuth()
 const { files } = useProjectFiles(projectId)
 const { messages, liveFiles, streamingFiles, streaming, error, send } = useGeneration(projectId)
+
+// Fresh enough for a dev-scoped preview session; doesn't auto-refresh on
+// expiry (~1h) — see docs/KNOWN_GAPS.md.
+const previewToken = ref('')
+watch(
+  user,
+  async (u) => {
+    previewToken.value = u ? await u.getIdToken() : ''
+  },
+  { immediate: true },
+)
+
+const previewHtml = computed(() => {
+  const indexFile = files.value.find((f) => f.path === 'index.html')
+  if (!indexFile || !previewToken.value) return ''
+  const inject = `<script>window.GENESIS_PROJECT_ID=${JSON.stringify(projectId.value)};window.GENESIS_ID_TOKEN=${JSON.stringify(previewToken.value)};<\/script>`
+  return indexFile.content.includes('<head>')
+    ? indexFile.content.replace('<head>', `<head>${inject}`)
+    : inject + indexFile.content
+})
 
 const prompt = ref('')
 const activePath = ref<string | undefined>(undefined)
@@ -68,10 +91,16 @@ async function onEditorChange(value: string | undefined) {
   if (streaming.value || !activeFileId.value || value === undefined) return
   savingPath.value = activePath.value
   try {
-    await updateDoc(doc(db, `projects/${projectId.value}/files`, activeFileId.value), {
-      content: value,
-      updatedAt: serverTimestamp(),
-    })
+    await Promise.all([
+      updateDoc(doc(db, `projects/${projectId.value}/files`, activeFileId.value), {
+        content: value,
+        updatedAt: serverTimestamp(),
+      }),
+      // A manual edit diverges the live files from whichever snapshot was
+      // active, so no snapshot should show as "current" until the next
+      // generation or restore.
+      updateDoc(doc(db, 'projects', projectId.value), { activeSnapshotId: null }),
+    ])
   } finally {
     savingPath.value = undefined
   }
@@ -99,6 +128,7 @@ watch(projectId, () => {
           generating…
         </Badge>
       </div>
+      <SnapshotHistorySheet :project-id="projectId" />
     </header>
 
     <div class="grid min-h-0 flex-1 grid-cols-[320px_1fr_1fr] overflow-hidden">
@@ -158,11 +188,17 @@ watch(projectId, () => {
         </div>
       </div>
 
-      <!-- Preview (Phase 4b) -->
+      <!-- Preview -->
       <div class="flex min-h-0 flex-col border-l">
         <div class="border-b px-3 py-2 text-xs font-medium text-muted-foreground">Preview</div>
-        <div class="flex flex-1 items-center justify-center text-center text-sm text-muted-foreground">
-          Live preview lands in Phase 4b —<br />generated apps don't run here yet.
+        <iframe
+          v-if="previewHtml"
+          :srcdoc="previewHtml"
+          class="min-h-0 flex-1 bg-white"
+          title="Live preview"
+        />
+        <div v-else class="flex flex-1 items-center justify-center text-center text-sm text-muted-foreground">
+          No index.html yet —<br />generate something to see it render here.
         </div>
       </div>
     </div>

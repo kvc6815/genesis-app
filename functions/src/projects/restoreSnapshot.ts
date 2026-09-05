@@ -18,6 +18,11 @@ export async function restoreSnapshot(projectId: string, snapshotId: string): Pr
   for (const doc of snapshotFiles.docs) {
     batch.set(db.doc(`projects/${projectId}/files/${doc.id}`), doc.data())
   }
+  batch.set(
+    db.doc(`projects/${projectId}`),
+    { fileCount: snapshotFiles.size, activeSnapshotId: snapshotId },
+    { merge: true },
+  )
 
   await batch.commit()
 }

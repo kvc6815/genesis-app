@@ -101,6 +101,12 @@ export class FileBoundaryParser {
     return events
   }
 
+  // True if the stream ended mid-file (no proper end marker) — that file's
+  // content is definitely incomplete. Check before flush(), which resets state.
+  isInsideUnclosedFile(): string | null {
+    return this.state === 'inside' ? this.currentPath : null
+  }
+
   // Call once the stream ends. Flushes whatever's left in the buffer — if
   // we're still 'inside' a file, that file never got a proper end marker
   // (malformed output), so we close it out anyway rather than lose content.

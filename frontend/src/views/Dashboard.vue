@@ -138,9 +138,6 @@ function onDeleteProject(projectId: string) {
           {{ connecting ? 'Redirecting…' : 'Connect HighLevel →' }}
         </Button>
       </div>
-      <p v-else-if="status.connected" class="text-sm text-muted-foreground">
-        Connected to location <span class="font-mono text-foreground">{{ status.locationId }}</span>
-      </p>
 
       <div class="flex items-baseline justify-between">
         <h2 class="font-semibold">Projects</h2>

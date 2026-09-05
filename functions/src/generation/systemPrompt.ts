@@ -9,6 +9,18 @@ export interface SystemPromptContext {
   existingFiles: ExistingFile[]
 }
 
+const PREVIEW_CONSTRAINTS = `
+The generated app renders in a sandboxed srcdoc iframe — a static HTML render with no build
+step, no bundler, no module resolution across files, no JSX transpilation. To actually run
+there, you MUST produce exactly one file, always named index.html, fully self-contained:
+- All CSS inline in a <style> tag, all JS inline in a <script> tag. No separate .css/.js files,
+  no <link>/<script src="..."> to anything you wrote yourself.
+- No "import"/"export" of local modules. No JSX. Plain HTML/CSS/vanilla JS.
+- If you want React or another library, load it from a CDN via <script src="https://...">
+  in index.html and use it via its global (e.g. React.createElement) — never assume a build
+  step will process JSX or ESM imports for you.
+`.trim()
+
 const HL_CAPABILITIES = `
 You have access to the following HighLevel data through proxied endpoints on this app's own
 backend — NEVER call services.leadconnectorhq.com or any HighLevel domain directly, and never
@@ -25,6 +37,14 @@ fetch() to a relative path:
 
 All of these return real data from the connected HighLevel location. Build UI around whatever
 shape comes back; don't invent fields that aren't in the response shapes above.
+
+Every one of these calls MUST include two extra query params for auth, read from globals that
+are already defined in the page before your script runs: window.GENESIS_ID_TOKEN and
+window.GENESIS_PROJECT_ID. Example:
+
+fetch('/api/hl/contacts?pageLimit=20'
+  + '&idToken=' + encodeURIComponent(window.GENESIS_ID_TOKEN)
+  + '&projectId=' + encodeURIComponent(window.GENESIS_PROJECT_ID))
 `.trim()
 
 const FILE_FORMAT_INSTRUCTIONS = `
@@ -59,6 +79,8 @@ export function buildSystemPrompt(ctx: SystemPromptContext): string {
     `Project description: ${ctx.projectDescription || '(none given)'}`,
     '',
     filesSection,
+    '',
+    PREVIEW_CONSTRAINTS,
     '',
     HL_CAPABILITIES,
     '',

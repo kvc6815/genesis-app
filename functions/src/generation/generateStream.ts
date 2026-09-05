@@ -59,6 +59,7 @@ export const generateStream = onRequest(async (req, res) => {
   })
   const parser = new FileBoundaryParser()
   const generatedFiles = new Map<string, string>()
+  let stopReason: string | null = null
 
   const appendToFile = (path: string, data: string) => {
     generatedFiles.set(path, (generatedFiles.get(path) ?? '') + data)
@@ -82,7 +83,7 @@ export const generateStream = onRequest(async (req, res) => {
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const stream = anthropic.messages.stream({
     model: MODEL,
-    max_tokens: 8192,
+    max_tokens: 16384,
     system,
     messages: [{ role: 'user', content: message }],
   })
@@ -96,12 +97,33 @@ export const generateStream = onRequest(async (req, res) => {
     }
   })
 
+  // The Anthropic SDK treats hitting max_tokens as a normal stream
+  // completion (not an 'error') — without checking stop_reason, a response
+  // cut off mid-file would silently persist as if it succeeded, corrupting
+  // the file (this happened for real: a truncated <script> tag broke the
+  // preview with no error surfaced anywhere).
+  stream.on('finalMessage', (finalMsg) => {
+    stopReason = finalMsg.stop_reason
+  })
+
   stream.on('end', () => {
+    const unclosedPath = parser.isInsideUnclosedFile()
     for (const event of parser.flush()) {
       if (event.type === 'token' && event.path) appendToFile(event.path, event.data)
       send(event)
     }
-    void finishGeneration('complete')
+    if (stopReason === 'max_tokens') {
+      // That file's content is definitely incomplete — drop it rather than
+      // overwrite a previously-working version with a broken one. Any other
+      // files that finished cleanly before the cutoff are still kept.
+      if (unclosedPath) generatedFiles.delete(unclosedPath)
+      logger.warn(
+        `generateStream: response truncated (max_tokens) for project=${projectId}, dropped incomplete file=${unclosedPath}`,
+      )
+      void finishGeneration('error', 'Response was cut off (too long) — try asking for a smaller change.')
+    } else {
+      void finishGeneration('complete')
+    }
   })
 
   stream.on('error', (err) => {
