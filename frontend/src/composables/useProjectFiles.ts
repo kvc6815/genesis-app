@@ -1,11 +1,12 @@
 import { onUnmounted, ref, watch, type Ref } from 'vue'
-import { collection, onSnapshot, orderBy, query } from 'firebase/firestore'
+import { collection, onSnapshot, orderBy, query, type Timestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 
 export interface ProjectFile {
   id: string
   path: string
   content: string
+  updatedAt: Timestamp | null
 }
 
 export function useProjectFiles(projectId: Ref<string | undefined>) {

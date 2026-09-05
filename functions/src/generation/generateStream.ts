@@ -12,7 +12,13 @@ import { createSnapshot } from '../projects/createSnapshot'
 
 const MODEL = 'claude-sonnet-5'
 
-export const generateStream = onRequest(async (req, res) => {
+// Cloud Run's default HTTP timeout (60s) is too short for a multi-file
+// generation — hitting it force-closes the connection mid-stream, which
+// looks exactly like a client network drop (`req.on('close')` fires either
+// way) but is actually the platform cutting the request off. This happened
+// for real: a 3-file generation was truncated mid-statement in app.js with
+// no max_tokens warning, because the cutoff was the timeout, not the model.
+export const generateStream = onRequest({ timeoutSeconds: 300 }, async (req, res) => {
   // EventSource can only do GET with no custom headers, so auth travels as a
   // query param. Reject before any SSE headers go out, so failures are plain
   // HTTP error responses rather than SSE error events.

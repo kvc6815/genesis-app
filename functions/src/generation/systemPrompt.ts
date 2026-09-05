@@ -10,15 +10,21 @@ export interface SystemPromptContext {
 }
 
 const PREVIEW_CONSTRAINTS = `
-The generated app renders in a sandboxed srcdoc iframe — a static HTML render with no build
-step, no bundler, no module resolution across files, no JSX transpilation. To actually run
-there, you MUST produce exactly one file, always named index.html, fully self-contained:
-- All CSS inline in a <style> tag, all JS inline in a <script> tag. No separate .css/.js files,
-  no <link>/<script src="..."> to anything you wrote yourself.
-- No "import"/"export" of local modules. No JSX. Plain HTML/CSS/vanilla JS.
-- If you want React or another library, load it from a CDN via <script src="https://...">
-  in index.html and use it via its global (e.g. React.createElement) — never assume a build
-  step will process JSX or ESM imports for you.
+The generated app renders in a live preview with no build step, no bundler, no JSX
+transpilation, and no npm packages. Produce exactly three files, always named exactly this:
+- index.html — markup only. Link the other two with <link rel="stylesheet" href="style.css">
+  and <script src="app.js"></script> (a classic script, not type="module").
+- style.css — all CSS.
+- app.js — all JS.
+No other filenames, no additional files. No "import"/"export" of local modules (they aren't
+served as real modules). No JSX. Plain HTML/CSS/vanilla JS only. If you want React or another
+library, load it from a CDN via <script src="https://..."> in index.html and use it via its
+global (e.g. React.createElement) — never assume a build step will process JSX for you.
+
+When you're only changing styling or behavior, only re-emit style.css or app.js — you do NOT
+need to re-emit index.html or the other file too. Keeping edits scoped to the one file that
+actually changed matters: regenerating a large file you didn't need to touch wastes output and
+risks the response being cut off mid-file.
 `.trim()
 
 const HL_CAPABILITIES = `

@@ -8,6 +8,10 @@
         "function": "hlProxy"
       },
       {
+        "source": "/preview/**",
+        "function": "previewFile"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

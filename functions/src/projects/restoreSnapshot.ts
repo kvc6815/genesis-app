@@ -1,4 +1,4 @@
-import { getFirestore } from 'firebase-admin/firestore'
+import { FieldValue, getFirestore } from 'firebase-admin/firestore'
 
 export async function restoreSnapshot(projectId: string, snapshotId: string): Promise<void> {
   const db = getFirestore()
@@ -16,7 +16,14 @@ export async function restoreSnapshot(projectId: string, snapshotId: string): Pr
     }
   }
   for (const doc of snapshotFiles.docs) {
-    batch.set(db.doc(`projects/${projectId}/files/${doc.id}`), doc.data())
+    // Stamp a fresh updatedAt for the restore itself rather than copying the
+    // snapshot's frozen one — a restore is a new write to the live files NOW,
+    // and the frontend's preview cache-busting keys off this timestamp to
+    // detect that content changed.
+    batch.set(db.doc(`projects/${projectId}/files/${doc.id}`), {
+      ...doc.data(),
+      updatedAt: FieldValue.serverTimestamp(),
+    })
   }
   batch.set(
     db.doc(`projects/${projectId}`),

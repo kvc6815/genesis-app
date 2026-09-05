@@ -32,24 +32,46 @@ watch(
   { immediate: true },
 )
 
-const previewHtml = computed(() => {
-  const indexFile = files.value.find((f) => f.path === 'index.html')
-  if (!indexFile || !previewToken.value) return ''
-  const inject = `<script>window.GENESIS_PROJECT_ID=${JSON.stringify(projectId.value)};window.GENESIS_ID_TOKEN=${JSON.stringify(previewToken.value)};<\/script>`
-  return indexFile.content.includes('<head>')
-    ? indexFile.content.replace('<head>', `<head>${inject}`)
-    : inject + indexFile.content
+const previewIndexFile = computed(() => files.value.find((f) => f.path === 'index.html'))
+
+// Forces a genuinely fresh fetch whenever the served content changes — a
+// `src` string alone won't reload if the URL is unchanged, unlike the
+// srcdoc string this replaced. Belt-and-suspenders: this cache-busting
+// query param plus the `:key` remount below plus `Cache-Control: no-store`
+// on the response. The query string only affects the top-level navigation —
+// it does NOT get inherited by sibling relative loads (style.css, app.js),
+// so it can't interfere with those picking up the path-embedded idToken.
+//
+// Deliberately keyed off the MAX updatedAt across ALL files, not just
+// index.html: the system prompt tells Claude it doesn't need to re-emit
+// index.html when only style.css/app.js changed, so index.html's own
+// timestamp can stay identical across a restore that genuinely changes what
+// the preview renders — watching only that one file missed real changes.
+const previewVersion = computed(() =>
+  files.value.reduce((max, f) => Math.max(max, f.updatedAt?.toMillis() ?? 0), 0),
+)
+
+const previewUrl = computed(() => {
+  if (!previewIndexFile.value || !previewToken.value) return ''
+  return `/preview/${projectId.value}/${previewToken.value}/index.html?v=${previewVersion.value}`
 })
 
 const prompt = ref('')
 const activePath = ref<string | undefined>(undefined)
 const savingPath = ref<string | undefined>(undefined)
 
-// Every known path — persisted files plus anything currently/just streamed in
-// that Firestore hasn't synced back yet.
+// `liveFiles` is only trustworthy WHILE a generation is actively streaming —
+// it holds the in-progress buffer for live typing effects. Once streaming
+// stops (complete, error, or abort), Firestore's `files` is already the
+// up-to-date source of truth (persistence happens before `complete` fires),
+// so it must take priority again — otherwise a stale path/content from the
+// last generation lingers indefinitely (e.g. after a snapshot restore,
+// which never touches `liveFiles` at all) until a full page reload resets it.
 const allPaths = computed(() => {
   const set = new Set(files.value.map((f) => f.path))
-  for (const p of Object.keys(liveFiles.value)) set.add(p)
+  if (streaming.value) {
+    for (const p of Object.keys(liveFiles.value)) set.add(p)
+  }
   return Array.from(set).sort()
 })
 
@@ -64,12 +86,14 @@ watchEffect(() => {
 
 const activeContent = computed(() => {
   if (!activePath.value) return ''
-  if (activePath.value in liveFiles.value) return liveFiles.value[activePath.value]
+  if (streaming.value && activePath.value in liveFiles.value) return liveFiles.value[activePath.value]
   return files.value.find((f) => f.path === activePath.value)?.content ?? ''
 })
 
 const activeFileId = computed(() => files.value.find((f) => f.path === activePath.value)?.id ?? null)
-const isStreamingActive = computed(() => (activePath.value ? streamingFiles.value.has(activePath.value) : false))
+const isStreamingActive = computed(
+  () => streaming.value && !!activePath.value && streamingFiles.value.has(activePath.value),
+)
 
 function languageForPath(path: string): string {
   const ext = path.split('.').pop() ?? ''
@@ -163,7 +187,7 @@ watch(projectId, () => {
                 class="shrink-0 gap-1.5 text-xs"
               >
                 {{ p }}
-                <span v-if="streamingFiles.has(p)" class="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                <span v-if="streaming && streamingFiles.has(p)" class="h-1.5 w-1.5 rounded-full bg-amber-500" />
               </TabsTrigger>
             </TabsList>
           </div>
@@ -192,8 +216,9 @@ watch(projectId, () => {
       <div class="flex min-h-0 flex-col border-l">
         <div class="border-b px-3 py-2 text-xs font-medium text-muted-foreground">Preview</div>
         <iframe
-          v-if="previewHtml"
-          :srcdoc="previewHtml"
+          v-if="previewUrl"
+          :key="previewVersion"
+          :src="previewUrl"
           class="min-h-0 flex-1 bg-white"
           title="Live preview"
         />
